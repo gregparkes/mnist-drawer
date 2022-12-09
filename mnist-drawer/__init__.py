@@ -1,0 +1,1 @@
+"""Main method of MNIST drawer."""

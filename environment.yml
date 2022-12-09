@@ -1,8 +1,0 @@
-name: mnist-draw
-channels:
-- defaults
-dependencies:
-- python>=3.8
-- numpy
-- PySimpleGUI
-- tensorflow
