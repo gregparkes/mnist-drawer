@@ -2,11 +2,13 @@
 
 import argparse
 
-from .demo import MNISTApplication
+from ._gui_main import MNISTApplication
 from .recompile import retrain_pyt, retrain_tf
 
 
 def main():
+
+    
     parser = argparse.ArgumentParser(description='MNIST drawing demo.')
     parser.add_argument("-r","--recompile", action="store_true", help="Whether to recompile the model")
     parser.add_argument("-b","--backend", choices=("torch","tf"), default="torch", help="Neural network library backend")

@@ -56,11 +56,7 @@ def retrain_pyt():
             optimizer.step()
             if batch_idx % args.log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data), len(train_loader.dataset),
-                    100. * batch_idx / len(train_loader), loss.item()))
-            if args.dry_run:
-                break
-        # testing
+                    epoch, batch_idx * len(x), len(train_loader.dataset)))
 
 
 def retrain_tf():
