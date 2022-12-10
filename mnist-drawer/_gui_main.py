@@ -216,7 +216,7 @@ class MNISTApplication:
             if self.ocsvm_present:
                 # convert grid into scaled format
                 sample = (self.grid * 2 - 1.).reshape(1, 28*28).astype(np.float32)
-                # run skl2onnx runtime predictor.
+                # create a decision boundary.
                 decision = self._ocsvm.decision_function(sample)
                 dec_proportion = (np.sign(decision) * np.sqrt(np.abs(decision) * .2))[0]
                 prop_label = "Known" if dec_proportion > 0 else "Unknown"

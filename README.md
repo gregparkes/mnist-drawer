@@ -1,6 +1,6 @@
 # MNIST-drawer
 
-Draw handwritten digits yourself and classify them in *real-time* on the MNIST dataset. We provide a Graphical User Interface (GUI) and a pre-trained neural network model to do the heavy lifting for you.
+Draw handwritten digits yourself and classify them in *real-time* on the MNIST dataset. We provide a Graphical User Interface (GUI) and a pre-trained neural network model (written in PyTorch) to do the heavy lifting for you.
 
 ![Image not found](resources/gui2.png)
 
@@ -14,9 +14,29 @@ Clone this repository, load the requirements and call:
 python -m mnist-drawer
 ```
 
-This should open a GUI for you to play with. Clicking **draw** will paint on white areas, **erase** will remove white areas, the brush slider indicates the radius of the drawing brush, clear will remove the digit and **sample** will retrieve an example from the MNIST dataset. The model will predict whats in the canvas whenever the mouse up event is triggered.
+Alternatively the GUI can be called directly:
 
-Initially when you run the application, it will take a few seconds to asynchronously import tensorflow, so please be patient.
+```python
+from mnist-drawer import MNISTApplication
+# initialise the GUI
+app = MNISTApplication()
+# start the main event loop
+app.mainloop()
+# close the window
+app.window.close()
+```
+
+This should open a GUI for you to play with. You can:
+
+* draw on the canvas with the left-click 
+* erase with the right click
+* scroll with the mouse wheel to increase or decrease the brush size. 
+
+Random samples from MNIST can be fetched with the *Random* button. By clicking the *Retrain* button opens a second window where you can re-train the CNN if desired:
+
+![Image not found](resources/gui3.png)
+
+The One-Class SVM model can be retrained using `python oneclasssvm.py`.
 
 ## Requirements
 
@@ -24,22 +44,10 @@ Initially when you run the application, it will take a few seconds to asynchrono
 - `pytorch`
 - `pysimplegui`
 - `numpy`
+- `scikit-learn`
 
 Use the requirements file as `pip install -r requirements.txt`.
 
-## Network architecture
+## License
 
-The network takes a binarized version of the MNIST digits (all values are 0 or 1) 
-
-The trained model bears a CNN architecture of the following layers:
-
-1. Input layer
-2. Conv2D (16 filters, kernel size (3x3)), relu activation
-3. MaxPooling2D (2x2)
-4. Conv2D (32 filters, kernel size (3x3)), relu activation
-5. MaxPooling2D (2x2)
-6. Flatten
-7. Dense layer (64), relu activation
-8. Dropout 20%
-9. Dense layer (32), relu activation
-10. Final layer (softmax)
+This repository is licensed under MIT and is free to use.

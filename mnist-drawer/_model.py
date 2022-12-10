@@ -26,24 +26,3 @@ class LeNet(nn.Module):
     
     def name(self):
         return "LeNet"
-
-
-def kerasmodel(dim, classes):
-    from tensorflow.keras import Sequential, Input
-    from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout
-
-    model = Sequential([
-        Input((*dim, 1)),
-        Conv2D(16, kernel_size=(3, 3), activation="relu", name="conv1"),
-        MaxPooling2D((2, 2), name="pool1"),
-        Conv2D(32, kernel_size=(3, 3), activation="relu", name="conv2"),
-        MaxPooling2D((2, 2), name="pool2"),
-        Flatten(),
-        Dense(64, activation="relu", name="dense1"),
-        Dropout(0.2, name="drop1"),
-        Dense(32, activation="relu", name="dense2"),
-        Dense(classes, activation="softmax")
-    ])
-    return model
-
-
