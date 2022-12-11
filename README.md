@@ -11,13 +11,13 @@ Inspired by Sebastian Lague's wonderful YouTube channel and video: https://www.y
 Clone this repository, load the requirements and call:
 
 ```python
-python -m mnist-drawer
+python -m mnist_drawer
 ```
 
 Alternatively the GUI can be called directly:
 
 ```python
-from mnist-drawer import MNISTApplication
+from mnist_drawer import MNISTApplication
 # initialise the GUI
 app = MNISTApplication()
 # start the main event loop

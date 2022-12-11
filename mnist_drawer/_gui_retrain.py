@@ -1,15 +1,7 @@
 
-import time
 import PySimpleGUI as sg
-import numpy as np
-import os
-import argparse
-import gzip
 # pytorch
-import torch
 
-from ._load_data import dataset_mnist_pytorch, loader_mnist_pytorch
-from ._model import LeNet
 from ._train_model import retrain_pyt
 from ._util import parse_float, parse_int
 
@@ -46,8 +38,8 @@ class RetrainWindow:
 
             [sg.Text("Training Progress", size=DEF_TEXT_SIZE, font="ANY 15")],
             [sg.Text(f"Epoch 0/{TOTAL_EPOCHS}", font=DEF_FONT, key="-EPOCH_TEXT-"), 
-            sg.ProgressBar(number_of_batches, size=(40, 10), key="-PROG_BAR-")],
-
+             sg.ProgressBar(number_of_batches, size=(40, 10), key="-PROG_BAR-")],
+            [sg.Text("Time: 0s", font=DEF_FONT, key="-TIME_TEXT-")],
         ]
 
         self.window = sg.Window("MNIST CNN Retrainer", layout, modal=True, finalize=True)
@@ -75,7 +67,9 @@ class RetrainWindow:
 
                 self.window.perform_long_operation(
                     lambda : retrain_pyt(self.window['-PROG_BAR-'], self.window['-EPOCH_TEXT-'],
-                    batch_size, total_epoch, lr, mom, save_mod, True),
-                 "-FINISH_TRAIN-")
+                        self.window['-TIME_TEXT-'], batch_size, total_epoch, lr, mom, 
+                        save_mod, True),
+                    "-FINISH_TRAIN-"
+                )
        
         self.window.close()
