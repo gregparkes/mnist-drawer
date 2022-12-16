@@ -1,6 +1,5 @@
 """Loading datasets"""
 
-import gzip, os, numpy as np
 import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
@@ -32,38 +31,3 @@ def loader_mnist_pytorch(root ="./data", batch_size = 32):
     )
 
     return train_loader, test_loader
-
-
-def load_data_tensorflow():
-    # the training data is present locally...
-    if os.path.isfile("data/train-images-idx3-ubyte.gz"):
-        # load directly
-        # loading in training data
-        with gzip.open("data/train-images-idx3-ubyte.gz","r") as f:
-            image_size = 28
-
-            f.read(16)
-            buf = f.read(image_size * image_size * 60000)
-            data = np.frombuffer(buf, dtype=np.uint8).astype(np.float32)
-            data = data.reshape(60000, image_size, image_size)
-            
-        with gzip.open('data/train-labels-idx1-ubyte.gz','r') as f:
-            f.read(8)
-            labels = np.frombuffer(f.read(60000), dtype=np.uint8)
-        
-        # loading in test data
-        with gzip.open("data/t10k-images-idx3-ubyte.gz","r") as f:
-            image_size = 28
-
-            f.read(16)
-            buf = f.read(image_size * image_size * 10000)
-            test_data = np.frombuffer(buf, dtype=np.uint8).astype(np.float32)
-            test_data = test_data.reshape(10000, image_size, image_size)
-            
-        with gzip.open('data/t10k-labels-idx1-ubyte.gz','r') as f:
-            f.read(8)
-            test_labels = np.frombuffer(f.read(10000), dtype=np.uint8)
-    else:
-        # load from the keras source
-        (data,labels), (test_data,test_labels) = datasets.mnist.load_data(path="mnist.npz")
-    return (data,labels), (test_data,test_labels) 
