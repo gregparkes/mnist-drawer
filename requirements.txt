@@ -1,4 +1,7 @@
 numpy
-torch
+scipy
 PySimpleGUI
 scikit-learn
+torch
+torchinfo
+tqdm
