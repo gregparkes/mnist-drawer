@@ -6,11 +6,10 @@ import os
 # pytorch
 import torch
 import torchvision.transforms as T
-import json
 from scipy.signal import convolve2d
 
-from ._load_data import dataset_mnist_pytorch
-from ._model import LeNet
+from ._load_data import MNISTData
+from ._model import Model, ModelParams
 from ._gui_retrain import RetrainWindow
 from ._util import rgb_to_hex
 
@@ -21,21 +20,32 @@ class MNISTApplication:
         self.verbose = verbose
 
         sg.theme("LightGreen6")
+        # specify a 28x28 grid of cells to draw into.
         self.N = 28
+        # holds the actual colour
         self.grid = np.zeros((self.N, self.N), dtype="i")
+        # [x, y] indices of each grid mapping
         self.boxloc = np.zeros((self.N, self.N, 2), dtype="i")
+        # an array holding the pysimplegui reference pointers
         self.rects = np.zeros_like(self.grid)
 
         self.BOX_SIZE = 20
         self.brush = 25
         self.brush_sq = self.brush*self.brush
-        self.model = None
-        self.model_loaded = False
         # in seconds
         self.model_predict_freq = 0.4
         GRAPH_DIMS = 560
         DEF_FONT = "ANY 13"
 
+        # model arguments
+        DEFAULT_MODEL = os.path.abspath("models/mnist_cnn.pt")
+        self.model_params = ModelParams(128)
+        self.model = Model(self.model_params)
+
+        # raw dataset
+        self.mnist = MNISTData(self.model_params)
+
+        # GUI starts here
         self.graph = sg.Graph((600, 600), (0, 0), 
                     (GRAPH_DIMS, GRAPH_DIMS),
                      key="-GRAPH-", enable_events=True, 
@@ -84,32 +94,6 @@ class MNISTApplication:
             [tab2]
         ]
 
-        # now attempt to load the PyTorch CNN model.
-        if os.path.isfile("models/mnist_cnn.pt"):
-            DEFAULT_MODEL = os.path.abspath("models/mnist_cnn.pt")
-            # load the model and set to loaded = True
-            self.model = LeNet((24, 24)).to("cpu")
-            model_state = torch.load(DEFAULT_MODEL, map_location=torch.device("cpu"))
-            self.model.load_state_dict(model_state)
-            self.model_loaded = True
-        else:
-            DEFAULT_MODEL = ""
-
-        # attempt to load ONNX runtime
-        if os.path.isfile("models/ocsvm.json"):
-            self.ocsvm_present = True
-            from sklearn.linear_model import SGDOneClassSVM
-            self._ocsvm = SGDOneClassSVM()
-            with open("models/ocsvm.json", "rt") as f:
-                ocsvm_state = json.load(f)
-                self._ocsvm.coef_ = np.array(ocsvm_state['coef_'])
-                self._ocsvm.offset_ = np.array(ocsvm_state['offset_'])
-                self._ocsvm.n_iter_ = ocsvm_state['n_iter_']
-                self._ocsvm.t_ = ocsvm_state['t_']
-                self._ocsvm.n_features_in_ = ocsvm_state['n_features_in_']
-        else:
-            self.ocsvm_present = False
-
         layout_l = [
             [sg.Text("Weights", font=DEF_FONT), 
              sg.In(enable_events=True, font=DEF_FONT, key="-FOLDER-", default_text=DEFAULT_MODEL), 
@@ -145,13 +129,8 @@ class MNISTApplication:
         # add circle in the middle.
         self.circle = self.graph.draw_circle((GRAPH_DIMS/2,GRAPH_DIMS/2),
             self.brush, line_color="red", line_width=3)
-        # load MNIST test set.
-        _, self.mnist_test = dataset_mnist_pytorch(normalize=False)
-        self.test_set_computed = False
 
-        self._test_tf = T.Compose([T.CenterCrop(24), T.Normalize((.5,), (1.,))])
-
-    def _redraw_rect(self, x, y):
+    def _redraw_rect(self, x: int, y: int):
         colour = rgb_to_hex(self.grid[x, y])      
         self.graph.tk_canvas.itemconfig(self.rects[x, y], fill=colour)
     
@@ -160,7 +139,7 @@ class MNISTApplication:
             for i in range(self.N):
                 self._redraw_rect(i, j)
 
-    def _redraw_circle(self, mouse):
+    def _redraw_circle(self, mouse: tuple[int, int]):
         self.graph.delete_figure(self.circle)
         self.circle = self.graph.draw_circle(mouse, self.brush, 
             line_color="red", line_width=3)
@@ -177,12 +156,13 @@ class MNISTApplication:
         x, y = np.where(condition)
         # zip the points togther, loop over and re-draw the corresponding rectangles.
         for i, j in zip(x, y):
+            # set rect[i, j] on the canvas to the 'self.grid' colour
             self._redraw_rect(i, j)
                     
         # compute the time taken.
         t = time.perf_counter()
         # if we've elapsed since the last predict, do it agian.
-        if (t - self.time_since_last) > self.model_predict_freq:
+        if self.model.is_loaded and ((t - self.time_since_last) > self.model_predict_freq):
             self._predict_label()
             self.time_since_last = t
         # update the mouse
@@ -192,33 +172,11 @@ class MNISTApplication:
 
     def _predict_label(self, force=False):
         # we need to rotate the thing 90 degrees
-        if self.model_loaded or force:
-            # set model to evaluation mode
-            self.model.eval()
-            # load the data from the grid, reshape.
-            # clone the grid.
-            x = torch.reshape(torch.rot90(torch.tensor(self.grid, dtype=torch.float32)), (1, 1, 28, 28))
-            # preprocess x with testing transforms.
-            x = self._test_tf(x)
-
-            with torch.no_grad():
-                outputs = self.model(x)
-                preds = torch.softmax(torch.flatten(outputs), 0)
-                # update the table values in one go.
-                self._tab_values = [[a, "{:0.2f}%".format(b*100.)] for a, b in zip(self._numbs, preds.numpy())]
-                self.window['-CNNTABLE-'].update(values=self._tab_values)
-
-            # also run in OC-SVM model if present
-            if self.ocsvm_present:
-                # convert grid into scaled format
-                sample = (self.grid * 2 - 1.).reshape(1, 28*28).astype(np.float32)
-                # create a decision boundary.
-                decision = self._ocsvm.decision_function(sample)
-                dec_proportion = (np.sign(decision) * np.sqrt(np.abs(decision) * .2))[0]
-                prop_label = "Known" if dec_proportion > 0 else "Unknown"
-                self.window['-OCSVMTABLE-'].update(
-                    values=[[prop_label, "{:0.2f}".format(dec_proportion)]]
-                )
+        if self.model.is_loaded or force:
+            y = self.model.forward(self.grid)
+            # update the table values in one go.
+            self._tab_values = [[a, "{:0.2f}%".format(b*100.)] for a, b in zip(self._numbs, y)]
+            self.window['-CNNTABLE-'].update(values=self._tab_values)
 
     def mainloop(self):
         # begin the event loop
@@ -226,6 +184,10 @@ class MNISTApplication:
         self.time_since_last = 0
         self.last_mouse = (0, 0)
         right_click_canvas = False
+
+        self.window.perform_long_operation(self.mnist.load, "-DATA_LOADED-")
+        # load model
+        self.window.perform_long_operation(self.model.load, "-MODEL_LOADED-")
 
         gkern2d = np.random.uniform(0.85, 0.95, size=(3, 3))
         gkern2d[np.diag_indices_from(gkern2d)] = 1
@@ -248,28 +210,31 @@ class MNISTApplication:
                 # loop through all the rectangles and re-draw them
                 self._redraw_grid()
 
-                if self.model_loaded:
+                if self.model.is_loaded:
                     self._predict_label()
-                
+
+            elif event == "-MODEL_LOADED-" and self.model.net:
+                self.model.is_loaded = True
+            
+            elif event == "-DATA_LOADED-" and self.mnist.test_set:
+                self.mnist.is_loaded = True
+
             elif event == "-FOLDER-":
                 # loading a keras model from the folder browser.
                 # check values folder
                 if os.path.exists(values['-FOLDER-']):
-                    self.model = LeNet((24, 24)).to("cpu")
-                    model_state = torch.load(values['-FOLDER-'], 
-                        map_location=torch.device("cpu"))
-                    self.model.load_state_dict(model_state)
-                    self.model_loaded = True
+                    self.model.is_loaded = False
+                    self.window.perform_long_operation(self.model.load, "-MODEL_LOADED-")
             
-            elif event == "-SAMPLE-":
-                test_sample_image, _ = self.mnist_test[np.random.choice(10000)]
+            elif event == "-SAMPLE-" and self.mnist.is_loaded:
+                test_sample_image, _ = self.mnist.test_set[np.random.choice(10000)]
                 # threshold image into an integer format.
                 test_sample_npy = torch.rot90(
                     torch.reshape(test_sample_image, (28, 28)), k=3)
                 self.grid = test_sample_npy.numpy()
                 # re-draw the grid.
                 self._redraw_grid()
-                if self.model_loaded:
+                if self.model.is_loaded:
                     self._predict_label()
             
             elif event == "-CONVOLVE-":
@@ -277,7 +242,7 @@ class MNISTApplication:
                 self.grid = convolve2d(self.grid, gkern2d, mode="same")
                 # loop through all the rectangles and re-draw them
                 self._redraw_grid()
-                if self.model_loaded:
+                if self.model.is_loaded:
                     self._predict_label()
 
             elif event.endswith("+MOVE"):
@@ -289,7 +254,8 @@ class MNISTApplication:
 
             elif event == "-GRAPH-+UP":
                 # mouse up event. do a prediction.
-                self._predict_label()
+                if self.model.is_loaded:
+                    self._predict_label()
 
             elif event == "MouseWheel:Up":
                 # make brush larger
@@ -305,6 +271,7 @@ class MNISTApplication:
 
             # = LEFT-CLICK
             elif event == "-GRAPH-":
+                """Add white to the surrounding boxes."""
                 self._draw_tool(values, 1)
             
             # right click on graph
@@ -315,5 +282,5 @@ class MNISTApplication:
 
             elif event == "-RETRAIN-":
                 #self.window.perform_long_operation(lambda :  retrain_pyt(True), "-FINISH_RETRAIN-")
-                rt_win = RetrainWindow(self.verbose)
+                rt_win = RetrainWindow(self.mnist, self.model_params, self.verbose)
                 rt_win.mainloop()

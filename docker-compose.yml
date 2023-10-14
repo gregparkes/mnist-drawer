@@ -1,0 +1,8 @@
+services:
+  draw:
+    image: mnist_draw
+    build: .
+    volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - DISPLAY=${DISPLAY}

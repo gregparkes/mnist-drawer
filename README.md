@@ -48,6 +48,18 @@ The One-Class SVM model can be retrained using `python oneclasssvm.py`.
 
 Use the requirements file as `pip install -r requirements.txt`.
 
+## Installation
+
+Follow the instructions below:
+
+```
+conda create -n mnist_drawer pip numpy scipy scikit-learn
+conda activate mnist_drawer
+pip3 install -r requirements.txt
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+pip3 install torchinfo PySimpleGUi
+```
+
 ## License
 
 This repository is licensed under MIT and is free to use.

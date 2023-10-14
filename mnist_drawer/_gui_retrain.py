@@ -3,18 +3,21 @@ import PySimpleGUI as sg
 # pytorch
 from torchinfo import summary
 
-from ._model import LeNet
+from ._model import Model, ModelParams
+from ._load_data import MNISTData
 from ._train_model import retrain_pyt
 from ._util import parse_float, parse_int
 
 
 class RetrainWindow:
 
-    def __init__(self, verbose):
+    def __init__(self, data: MNISTData, params: ModelParams, verbose: bool = False):
         """Defines and initialises a modal window."""
         DEF_TEXT_SIZE = (20, 1)
         DEF_FONT = "ANY 12"
 
+        self.mnist = data
+        self.params = params
         self.verbose = verbose
 
         DEFAULT_BATCH_SIZE = 128
@@ -49,8 +52,7 @@ class RetrainWindow:
         ]
 
         self.window = sg.Window("MNIST CNN Retrainer", layout, modal=True, finalize=True)
-
-        self.model = LeNet((24, 24))
+        self.model = Model(self.params)
 
     def mainloop(self):
         # infinite event loop.
@@ -64,12 +66,11 @@ class RetrainWindow:
                 # block button
                 self.window['-TRAIN-'].update(disabled=True)
                 # get batch_size 
-                batch_size = parse_int(values['-BATCH_SIZE-'])
-                number_of_batches = 60000 // batch_size
-                total_epoch = parse_int(values['-TOTAL_EPOCHS-'])
-                lr = parse_float(values['-LR-'])
-                mom = parse_float(values['-MOMENTUM-'])
-                save_mod = values['-SAVE_CHECK-']
+                self.params.batch_size = parse_int(values['-BATCH_SIZE-'])
+                number_of_batches = 60000 // self.params.batch_size
+                self.params.n_epochs = parse_int(values['-TOTAL_EPOCHS-'])
+                self.params.learning_rate = parse_float(values['-LR-'])
+                self.params.momentum = parse_float(values['-MOMENTUM-'])
                 # firstly adjust the progress bar length
                 self.window['-PROG_BAR-'].update(max=number_of_batches)
 
@@ -81,18 +82,22 @@ class RetrainWindow:
                 self.window.perform_long_operation(
                     lambda : retrain_pyt(
                         gui_elems,
-                        batch_size, 
-                        total_epoch, 
-                        lr, mom, 
-                        save_mod, 
-                        self.verbose,
-                        True),
+                        self.mnist, 
+                        self.params,
+                        verbose=self.verbose),
                     "-FINISH_TRAIN-"
                 )
 
-            elif event == "-ARCH-":
+            elif event == "-FINISH_TRAIN-":
+                # re-load the model
+                self.model.is_loaded = False
+                self.window.perform_long_operation(self.model.load, "-FINISH_LOAD-")
+
+            elif event == "-FINISH_LOAD-":
+                self.model.is_loaded = True
+
+            elif event == "-ARCH-" and self.model.is_loaded:
                 # generate pop up with model architecture.
-                summary(self.model, (64, 1, 24, 24))
-                pass
+                summary(self.model.net, (self.params.batch_size, 1, self.params.input_size, self.params.input_size))
        
         self.window.close()

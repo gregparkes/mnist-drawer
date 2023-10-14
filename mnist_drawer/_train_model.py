@@ -5,62 +5,47 @@ Requires the MNIST dataset in the data/ folder."""
 import numpy as np
 import os
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torchvision.transforms as T
-import torchvision.datasets as datasets
+from torch import nn, optim
 from torch.autograd import Variable
 
-from ._model import LeNet
+from ._model import LeNet, ModelParams
+from ._load_data import MNISTData
 from ._fixed_queue import FixedQueue
 
 
 def retrain_pyt(gui_elems,
-                batch_size,
-                n_epochs = 20, 
-                learning_rate = 0.01, 
-                momentum = 0.9,
-                override_save_model = True,
-                verbose = False,
-                train_gpu = True):
+                mnist: MNISTData,
+                params: ModelParams = None,
+                verbose: bool = False):
 
     pbar_gui, epoch_text, time_text, loss_text = gui_elems
     ROOT = "./data"
     MODEL = "./models"
 
+    if not params:
+        params = ModelParams(128)
+
     if not os.path.exists(ROOT):
         os.mkdir(ROOT)
 
     # check whether cuda is available
-    use_cuda = torch.cuda.is_available() and train_gpu
+    use_cuda = torch.cuda.is_available() and params.is_gpu
 
-    NUMBER_OF_BATCHES = 60000 // batch_size
+    NUMBER_OF_BATCHES = 60000 // params.batch_size
 
-    affine = T.RandomAffine(degrees=(-30, 30), translate=(.1, .3), scale=(.5, 1.5))
-    tf_train = T.Compose([T.CenterCrop(24), affine, T.Resize((24, 24)), T.ToTensor(), T.Normalize((.5,), (1.,))])
-    tf_test = T.Compose([T.CenterCrop(24), T.ToTensor(), T.Normalize((.5,), (1.,))])
-    
-    mnist_train = datasets.MNIST(root=ROOT, train=True, download=False, transform=tf_train)
-    mnist_test = datasets.MNIST(root=ROOT, train=False, download=False, transform=tf_test)
-
-    train_loader = torch.utils.data.DataLoader(
-        dataset=mnist_train, batch_size=batch_size, shuffle=True, num_workers=4, 
-        pin_memory=True, persistent_workers=True
-    )
-    test_loader = torch.utils.data.DataLoader(
-        dataset=mnist_test, batch_size=batch_size, shuffle=False, pin_memory=True
-    )
+    train_loader = mnist.train_load
+    test_loader = mnist.test_load
 
     # define a model to train.
-    model = LeNet((24, 24))
+    model = LeNet(params.input_dims)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    optimizer = optim.SGD(model.parameters(), lr=params.learning_rate, momentum=params.momentum)
 
     if use_cuda:
         model = model.cuda()
         criterion = criterion.cuda()
     
-    ALL_STEPS = n_epochs * NUMBER_OF_BATCHES
+    ALL_STEPS = params.n_epochs * NUMBER_OF_BATCHES
 
     try:
         from tqdm import tqdm
@@ -76,10 +61,10 @@ def retrain_pyt(gui_elems,
     est_time_remaining = 0.
 
     # loop over some epochs.
-    for epoch in range(n_epochs):
+    for epoch in range(params.n_epochs):
         running_loss = 0.
         # update epoch text.
-        epoch_text.update(value=f"Epoch {epoch+1}/{n_epochs}")
+        epoch_text.update(value=f"Epoch {epoch+1}/{params.n_epochs}")
 
         # set the model to training mode.
         model.train()
@@ -147,7 +132,7 @@ def retrain_pyt(gui_elems,
     if has_tqdm:
         pbar.close()
 
-    if override_save_model:
+    if params.override_saved_model:
         # save the torch model.
         SAVE_PATH = os.path.abspath(os.path.join(MODEL, "mnist_cnn.pt"))
         print(f"Saving torch model to {SAVE_PATH}")
