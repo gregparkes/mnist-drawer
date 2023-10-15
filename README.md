@@ -2,7 +2,7 @@
 
 Draw handwritten digits yourself and classify them in *real-time* on the MNIST dataset. We provide a Graphical User Interface (GUI) and a pre-trained neural network model (written in PyTorch) to do the heavy lifting for you.
 
-![Image not found](resources/gui2.png)
+![Image not found](resources/screenclip1.mp4)
 
 Inspired by Sebastian Lague's wonderful YouTube channel and video: https://www.youtube.com/watch?v=hfMk-kjRv4c
 
